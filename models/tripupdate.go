@@ -30,9 +30,9 @@ type TUHeader struct {
 
 // TUEntity contains information about an individual trip
 type TUEntity struct {
-	ID      string     `json:"id"`
-	Deleted bool       `json:"is_deleted"`
-	Update  []TUUpdate `json:"trip_update"`
+	ID      string   `json:"id"`
+	Deleted bool     `json:"is_deleted"`
+	Update  TUUpdate `json:"trip_update"`
 }
 
 // TUUpdate is specific information about the status of a current trip

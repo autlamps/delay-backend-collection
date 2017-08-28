@@ -57,27 +57,36 @@ type TUVehicle struct {
 
 // TUStopUpdate contains information regarding the next stop on the trip
 type TUStopUpdate struct {
-	StopSequence         int       `json:"stop_sequence"`
-	StopID               string    `json:"stop_id"`
-	ScheduleRelationship int       `json:"schedule_relationship"`
-	Arrival              TUArrival `json:"arrival"`
+	StopSequence         int    `json:"stop_sequence"`
+	StopID               string `json:"stop_id"`
+	ScheduleRelationship int    `json:"schedule_relationship"`
+	Event                TUStopTimeEvent
 }
 
-// TUArrival states the number of seconds the service is running behind and the the vehicles eta for the next stop
-type TUArrival struct {
+// TUStopTimeEventType is whether the trip is arriving or departing the given stop
+type TUStopTimeEventType uint8
+
+const (
+	ARRIVAl = iota
+	DEPARTURE
+)
+
+// TUStopTimeEvent states the number of seconds the service is running behind and the the vehicles eta for the next stop
+type TUStopTimeEvent struct {
 	Delay int `json:"delay"`
 	Time  time.Time
+	Type  TUStopTimeEventType
 }
 
-// Custom unmarshal to convert float to Time in TUArrival
-func (a *TUArrival) UnmarshalJSON(data []byte) error {
-	type Arrival TUArrival
+// Custom unmarshal to convert float to Time in TUStopTimeEvent
+func (a *TUStopTimeEvent) UnmarshalJSON(data []byte) error {
+	type StopTimeEvent TUStopTimeEvent
 
 	temp := &struct {
 		FloatTime float64 `json:"time"`
-		*Arrival
+		*StopTimeEvent
 	}{
-		Arrival: (*Arrival)(a),
+		StopTimeEvent: (*StopTimeEvent)(a),
 	}
 
 	if err := json.Unmarshal(data, &temp); err != nil {
@@ -109,4 +118,45 @@ func (a *TUUpdate) UnmarshalJSON(data []byte) error {
 	a.Timestamp = time.Unix(int64(sec), 0)
 
 	return nil
+}
+
+// Custom unmarshal to convert either arrival or departure stoptimevent in json to TUStopTimeEvent
+func (u *TUStopUpdate) UnmarshalJSON(data []byte) error {
+
+	type StopUpdate TUStopUpdate
+
+	temp := &struct {
+		Departure TUStopTimeEvent `json:"departure"`
+		Arrival   TUStopTimeEvent `json:"arrival"`
+		*StopUpdate
+	}{
+		StopUpdate: (*StopUpdate)(u),
+	}
+
+	if err := json.Unmarshal(data, temp); err != nil {
+		return err
+	}
+
+	// Check to see if the StopTimeEvent is either departure of arrival
+	if temp.Departure.Time.Second() != 0 {
+		u.Event.Time = temp.Departure.Time
+		u.Event.Delay = temp.Departure.Delay
+		u.Event.Type = DEPARTURE
+	}
+
+	if temp.Arrival.Time.Second() != 0 {
+		u.Event.Time = temp.Arrival.Time
+		u.Event.Delay = temp.Arrival.Delay
+		u.Event.Type = ARRIVAl
+	}
+
+	return nil
+}
+
+// SECONDS_ABNORMAL is the number of seconds a trip has to stray from schedule in order to be considered abnormal
+const SECONDS_ABNORMAL = 240
+
+// IsAbnormal returns true if the entity is running abnormally (i.e late or early), false if it is running to schedule
+func (e *TUEntity) IsAbnormal() bool {
+	return !(e.Update.StopUpdate.Event.Delay > -SECONDS_ABNORMAL && e.Update.StopUpdate.Event.Delay < SECONDS_ABNORMAL)
 }

@@ -56,7 +56,7 @@ func (env *Env) Start() error {
 		return err
 	}
 
-	_, lateIDs := lateEntities(tu.Response.Entity)
+	late, lateIDs := lateEntities(tu.Response.Entity)
 
 	queryURL := env.createQueryURL("vehicleid", lateIDs)
 
@@ -78,6 +78,28 @@ func (env *Env) Start() error {
 	if err != nil {
 		logrus.WithField("err", err).Errorf("Failed to decode vehicle location json response")
 		return err
+	}
+
+	vlMap := make(map[string]models.VLEntity)
+
+	// Create a map of all vehicle location entities with vehicle id as the key
+	for _, e := range vl.Response.Entity {
+		vlMap[e.Vehicle.Vehicle.ID] = e
+	}
+
+	interTrips := []models.InterTrip{}
+
+	// Combine all our trip update entities and vehicle location entities into intermediate entities
+	for _, e := range late {
+
+		newInterTrip, err := models.NewInterTrip(e, vlMap[e.Update.Vehicle.ID])
+
+		if err != nil {
+			logrus.WithField("err", err).Errorf("Tried to create new InterTrip")
+			return err
+		}
+
+		interTrips = append(interTrips, newInterTrip)
 	}
 
 	return nil

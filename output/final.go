@@ -1,12 +1,12 @@
-package models
+package output
 
-import "time"
+import (
+	"time"
+)
 
-type TripService interface {
-	GetByGTFSID
-}
+// Final output output for json
 
-type Trip struct {
+type OutTrip struct {
 	TripID         string
 	RouteID        string
 	RouteLongName  string
@@ -24,6 +24,3 @@ type NextStop struct {
 	Lon     float64
 	Arrival time.Time
 }
-
-
-func

@@ -1,4 +1,4 @@
-package models
+package realtime
 
 // Models for response from /realtime/tripupdates endpoint
 

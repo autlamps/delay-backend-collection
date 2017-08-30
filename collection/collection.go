@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/autlamps/delay-backend-collection/models"
-	"github.com/go-redis/redis"
+	"github.com/autlamps/delay-backend-collection/output"
+	"github.com/autlamps/delay-backend-collection/realtime"
+	"github.com/autlamps/delay-backend-collection/static"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,20 +17,22 @@ import (
 type Conf struct {
 	ApiKey string
 	Db     *sql.DB
-	Redis  redis.Client
+	//Redis  redis.Client
 }
 
 // Env stores abstracted services for dealing with data
 type Env struct {
 	ApiKey string
+	Trips  static.TripStore
 }
 
-// EnvFromConf returns an env
+// EnvFromConf returns an env from a given conf
 func EnvFromConf(conf Conf) Env {
-	return Env{}
+	return Env{ApiKey: conf.ApiKey, Trips: static.TripServiceInit(conf.Db)}
 }
 
 // Start contains our main loop for calling the realtime api and extracting info
+// TODO: break this up into testable functions!
 func (env *Env) Start() error {
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/tripupdates?api_key=%v", env.ApiKey)
 
@@ -47,7 +50,7 @@ func (env *Env) Start() error {
 
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
-	var tu models.TUAPIResponse
+	var tu realtime.TUAPIResponse
 
 	err = decoder.Decode(&tu)
 
@@ -71,7 +74,7 @@ func (env *Env) Start() error {
 
 	defer resp1.Body.Close()
 	decoder = json.NewDecoder(resp1.Body)
-	var vl models.VLAPIResponse
+	var vl realtime.VLAPIResponse
 
 	err = decoder.Decode(&vl)
 
@@ -80,19 +83,19 @@ func (env *Env) Start() error {
 		return err
 	}
 
-	vlMap := make(map[string]models.VLEntity)
+	vlMap := make(map[string]realtime.VLEntity)
 
 	// Create a map of all vehicle location entities with vehicle id as the key
 	for _, e := range vl.Response.Entity {
 		vlMap[e.Vehicle.Vehicle.ID] = e
 	}
 
-	interTrips := []models.InterTrip{}
+	interTrips := []output.InterTrip{}
 
 	// Combine all our trip update entities and vehicle location entities into intermediate entities
 	for _, e := range late {
 
-		newInterTrip, err := models.NewInterTrip(e, vlMap[e.Update.Vehicle.ID])
+		newInterTrip, err := output.NewInterTrip(e, vlMap[e.Update.Vehicle.ID])
 
 		if err != nil {
 			logrus.WithField("err", err).Errorf("Tried to create new InterTrip")
@@ -106,9 +109,9 @@ func (env *Env) Start() error {
 }
 
 // lateEntities returns late entities and the vehicle ids of late entities
-func lateEntities(tu []models.TUEntity) ([]models.TUEntity, []string) {
+func lateEntities(tu []realtime.TUEntity) ([]realtime.TUEntity, []string) {
 
-	lateE := []models.TUEntity{}
+	lateE := []realtime.TUEntity{}
 	lateS := []string{}
 
 	for _, e := range tu {

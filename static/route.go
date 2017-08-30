@@ -1,4 +1,4 @@
-package models
+package static
 
 import "database/sql"
 

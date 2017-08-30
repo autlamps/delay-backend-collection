@@ -1,4 +1,4 @@
-package models
+package realtime
 
 import (
 	"encoding/json"

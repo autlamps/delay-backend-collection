@@ -1,4 +1,4 @@
-package models
+package static
 
 import "database/sql"
 
@@ -26,7 +26,7 @@ func TripServiceInit(db *sql.DB) *TripService {
 	return &TripService{DB: db}
 }
 
-// GetTripByGTFSID returns a trip with the given gtfs trip id or an error
+// GetTripByGTFSID returns a trip with the given realtime trip id or an error
 func (ts *TripService) GetTripByGTFSID(id string) (Trip, error) {
 	t := Trip{}
 

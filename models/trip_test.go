@@ -2,28 +2,14 @@ package models
 
 import (
 	"database/sql"
-	"flag"
-	"os"
 	"testing"
 
 	_ "github.com/lib/pq"
 )
 
-var dburl string
-
-// Grab postgres url
-func init() {
-	flag.StringVar(&dburl, "DB_URL", "", "database url for testing")
-	flag.Parse()
-
-	if dburl == "" {
-		dburl = os.Getenv("DB_URL")
-	}
-}
-
 func TestTripService_GetTripByGTFSID(t *testing.T) {
-
 	db, err := sql.Open("postgres", dburl)
+	defer db.Close()
 
 	if err != nil {
 		t.Fatalf("Failed to connect to db: %v", err)

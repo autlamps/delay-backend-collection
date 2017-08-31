@@ -34,9 +34,9 @@ func NewCombTrip(tu TUEntity, vl VLEntity) (CombEntity, error) {
 func CombineTripUpdates(tue TUEntities, vle VLEntities) ([]CombEntity, error) {
 	var ct []CombEntity
 
-	if len(tue) != len(vle) {
-		return []CombEntity{}, ErrMismatchUpdateLengths
-	}
+	//if len(tue) != len(vle) {
+	//	return []CombEntity{}, ErrMismatchUpdateLengths
+	//}
 
 	vlm := vle.ToMap()
 

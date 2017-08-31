@@ -17,8 +17,8 @@ type TUAPIResponse struct {
 
 // TUResponse is the response section of the apis response
 type TUResponse struct {
-	Header TUHeader   `json:"header"`
-	Entity []TUEntity `json:"entity"`
+	Header   TUHeader   `json:"header"`
+	Entities TUEntities `json:"entity"`
 }
 
 // TUHeader is the header section of the apis response
@@ -27,6 +27,9 @@ type TUHeader struct {
 	Incrementally int     `json:"incrementally"`
 	Timestamp     float64 `json:"timestamp"`
 }
+
+// TUEntities is simply a slice of TUEntity
+type TUEntities []TUEntity
 
 // TUEntity contains information about an individual trip
 type TUEntity struct {

@@ -39,12 +39,26 @@ type VLEntity struct {
 }
 
 type VLResponse struct {
-	Header VLHeader   `json:"header"`
-	Entity []VLEntity `json:"entity"`
+	Header   VLHeader   `json:"header"`
+	Entities VLEntities `json:"entity"`
 }
 
 type VLAPIResponse struct {
 	Status   string     `json:"status"`
 	Response VLResponse `json:"response"`
 	Error    string     `json:"error"`
+}
+
+// VLEntities is simply a slice of VLEntity
+type VLEntities []VLEntity
+
+// Converts a slice of VLEntity into a map with trip id as the key
+func (vle VLEntities) ToMap() map[string]VLEntity {
+	m := make(map[string]VLEntity)
+
+	for _, e := range vle {
+		m[e.Vehicle.Trip.TripID] = e
+	}
+
+	return m
 }

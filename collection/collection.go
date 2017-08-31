@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"sync"
+
 	"github.com/autlamps/delay-backend-collection/realtime"
 	"github.com/autlamps/delay-backend-collection/static"
 	"github.com/sirupsen/logrus"
@@ -61,10 +63,13 @@ func (env *Env) Start() error {
 		return err
 	}
 
-	wc := make(chan realtime.CombEntity, 500)
+	wc := make(chan realtime.CombEntity, 1000)
+	var wg sync.WaitGroup
+
+	wg.Add(env.WorkerNo)
 
 	for i := 0; i < env.WorkerNo; i++ {
-		go env.processEntity(wc)
+		go env.processEntity(wc, &wg)
 	}
 
 	for _, c := range cmb {
@@ -74,10 +79,7 @@ func (env *Env) Start() error {
 	close(wc)
 
 	// Block until all entities on the channel have been processed
-	var ok bool
-	for !ok {
-		_, ok = <-wc
-	}
+	wg.Wait()
 
 	return nil
 }
@@ -144,7 +146,9 @@ func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
 	rc <- VehicleLocationResult{vl, nil}
 }
 
-func (env *Env) processEntity(ec <-chan realtime.CombEntity) {
+func (env *Env) processEntity(ec <-chan realtime.CombEntity, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for e := range ec {
 		fmt.Println(e.Update.Trip.TripID)
 	}

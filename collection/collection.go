@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
-	"github.com/autlamps/delay-backend-collection/output"
 	"github.com/autlamps/delay-backend-collection/realtime"
 	"github.com/autlamps/delay-backend-collection/static"
 	"github.com/sirupsen/logrus"
@@ -15,137 +13,139 @@ import (
 
 // Conf stores the underlying clients (db, redis, rabbitmq) before they are turned into real services
 type Conf struct {
-	ApiKey string
-	Db     *sql.DB
+	ApiKey   string
+	WorkerNo int
+	Db       *sql.DB
 	//Redis  redis.Client
 }
 
 // Env stores abstracted services for dealing with data
 type Env struct {
-	ApiKey string
-	Trips  static.TripStore
+	ApiKey   string
+	WorkerNo int
+	Trips    static.TripStore
 }
 
 // EnvFromConf returns an env from a given conf
 func EnvFromConf(conf Conf) Env {
-	return Env{ApiKey: conf.ApiKey, Trips: static.TripServiceInit(conf.Db)}
+	return Env{ApiKey: conf.ApiKey, Trips: static.TripServiceInit(conf.Db), WorkerNo: conf.WorkerNo}
 }
 
 // Start contains our main loop for calling the realtime api and extracting info
-// TODO: break this up into testable functions!
 func (env *Env) Start() error {
-	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/tripupdates?api_key=%v", env.ApiKey)
+	turc := make(chan TripUpdateResult)
+	vlrc := make(chan VehicleLocationResult)
 
-	resp, err := http.Get(urlWithKey)
+	go env.GetRealtimeTripUpdates(turc)
+	go env.GetRealtimeVehicleLocations(vlrc)
 
-	if err != nil {
-		logrus.WithField("err", err).Error("Failed to call realtime tripupdates api")
-		return err
-	}
-
-	if resp.StatusCode == 403 {
-		logrus.WithField("resp", resp).Fatal("Incorrect api key used to call realtime api")
-		return err
-	}
-
-	defer resp.Body.Close()
-	decoder := json.NewDecoder(resp.Body)
-	var tu realtime.TUAPIResponse
-
-	err = decoder.Decode(&tu)
+	tur := <-turc
+	close(turc)
+	tu, err := tur.Unpack()
 
 	if err != nil {
-		logrus.WithField("err", err).Error("Failed to decode trip update json response")
 		return err
 	}
 
-	late, lateIDs := lateEntities(tu.Response.Entity)
-
-	queryURL := env.createQueryURL("vehicleid", lateIDs)
-
-	vehicleLocations := fmt.Sprintf("https://api.at.govt.nz/v1/public/realtime/vehiclelocations?%v", queryURL)
-
-	resp1, err := http.Get(vehicleLocations)
+	vlr := <-vlrc
+	close(vlrc)
+	vl, err := vlr.Unpack()
 
 	if err != nil {
-		logrus.WithField("err", err).Error("Failed to call realtime vehicle locations api")
 		return err
 	}
 
-	defer resp1.Body.Close()
-	decoder = json.NewDecoder(resp1.Body)
-	var vl realtime.VLAPIResponse
-
-	err = decoder.Decode(&vl)
+	cmb, err := realtime.CombineTripUpdates(tu.Response.Entities, vl.Response.Entities)
 
 	if err != nil {
-		logrus.WithField("err", err).Errorf("Failed to decode vehicle location json response")
 		return err
 	}
 
-	vlMap := make(map[string]realtime.VLEntity)
+	wc := make(chan realtime.CombEntity, 500)
 
-	// Create a map of all vehicle location entities with vehicle id as the key
-	for _, e := range vl.Response.Entity {
-		vlMap[e.Vehicle.Vehicle.ID] = e
+	for i := 0; i < env.WorkerNo; i++ {
+		go env.processEntity(wc)
 	}
 
-	interTrips := []output.InterTrip{}
+	for _, c := range cmb {
+		wc <- c
+	}
 
-	// Combine all our trip update entities and vehicle location entities into intermediate entities
-	for _, e := range late {
+	close(wc)
 
-		newInterTrip, err := output.NewInterTrip(e, vlMap[e.Update.Vehicle.ID])
-
-		if err != nil {
-			logrus.WithField("err", err).Errorf("Tried to create new InterTrip")
-			return err
-		}
-
-		interTrips = append(interTrips, newInterTrip)
+	// Block until all entities on the channel have been processed
+	var ok bool
+	for !ok {
+		_, ok = <-wc
 	}
 
 	return nil
 }
 
-// lateEntities returns late entities and the vehicle ids of late entities
-func lateEntities(tu []realtime.TUEntity) ([]realtime.TUEntity, []string) {
+// GetRealtimeTripUpdates calls the Trip Update api with the url and key from the env
+func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/tripupdates?api_key=%v", env.ApiKey)
 
-	lateE := []realtime.TUEntity{}
-	lateS := []string{}
+	resp, err := http.Get(urlWithKey)
 
-	for _, e := range tu {
-
-		if !e.IsAbnormal() {
-			continue
-		}
-
-		lateE = append(lateE, e)
-		lateS = append(lateS, e.Update.Vehicle.ID)
+	if err != nil {
+		logrus.WithField("err", err).Error("Failed to call realtime trip updates api")
+		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
 	}
 
-	return lateE, lateS
+	if resp.StatusCode == 403 {
+		// TODO: review whether or not this should halt execution
+		logrus.WithField("resp", resp).Fatal("Incorrect api key used to call trip updates api")
+		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
+
+	}
+
+	var tu realtime.TUAPIResponse
+
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&tu)
+
+	if err != nil {
+		logrus.WithField("err", err).Error("Failed to decode trip update json response")
+		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
+	}
+
+	rc <- TripUpdateResult{tu, nil}
 }
 
-// createQueryURL creates a url get query string for a given key and values also including the api key
-func (env *Env) createQueryURL(key string, value []string) string {
+func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/vehiclelocations?api_key=%v", env.ApiKey)
 
-	vs := ""
+	resp, err := http.Get(urlWithKey)
 
-	for i, v := range value {
-
-		if i == len(value) { // If last value don't add "," to the end
-			vs = vs + v
-			continue
-		}
-
-		vs = vs + v + ","
+	if err != nil {
+		logrus.WithField("err", err).Error("Failed to call realtime vehiclelocations api")
+		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
 	}
 
-	v := url.Values{}
+	if resp.StatusCode == 403 {
+		// TODO: review whether or not this should halt execution
+		logrus.WithField("resp", resp).Fatal("Incorrect api key used to call vehicle locations api")
+		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
+	}
 
-	v.Add(key, vs)
-	v.Add("api_key", env.ApiKey)
+	var vl realtime.VLAPIResponse
 
-	return v.Encode()
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&vl)
+
+	if err != nil {
+		logrus.WithField("err", err).Error("Failed to decode vehicle location json response")
+		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
+	}
+
+	rc <- VehicleLocationResult{vl, nil}
+}
+
+func (env *Env) processEntity(ec <-chan realtime.CombEntity) {
+	for e := range ec {
+		fmt.Println(e.Update.Trip.TripID)
+	}
 }

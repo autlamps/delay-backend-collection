@@ -29,9 +29,13 @@ func main() {
 	// TODO: move this to a proper env variable and a correct location
 	apiKey := ""
 
-	conf := collection.Conf{Db: db, ApiKey: apiKey}
+	conf := collection.Conf{Db: db, ApiKey: apiKey, WorkerNo: 2}
 	env := collection.EnvFromConf(conf)
-	env.Start()
+	err = env.Start()
+
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	fmt.Printf("Runtime: %v", time.Now().Sub(t))
 }

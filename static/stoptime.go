@@ -28,7 +28,7 @@ type StopTimeArray []StopTime
 
 // StopTimeStore defines the methods that a concrete StopTimeService should implement
 type StopTimeStore interface {
-	GetStopsByTripID(tripID string) ([]StopTime, error)
+	GetStopsByTripID(tripID string) (StopTimeArray, error)
 }
 
 // StopTimeService implements StopTimeStore in PSQL

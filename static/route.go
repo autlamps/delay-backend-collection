@@ -13,7 +13,7 @@ type Route struct {
 
 // RouteStore defines methods that a concrete implementation should implement
 type RouteStore interface {
-	GetBYRouteID(id string) (Route, error)
+	GetRouteByID(id string) (Route, error)
 }
 
 // RouteService is a psql implementation of RouteStore

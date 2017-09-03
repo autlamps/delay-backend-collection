@@ -1,7 +1,6 @@
 package collection
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,40 +9,66 @@ import (
 
 	"time"
 
+	"database/sql"
+
+	"github.com/autlamps/delay-backend-collection/notify"
 	"github.com/autlamps/delay-backend-collection/output"
 	"github.com/autlamps/delay-backend-collection/realtime"
 	"github.com/autlamps/delay-backend-collection/static"
 	log "github.com/sirupsen/logrus"
 )
 
-// Conf stores the underlying clients (db, redis, rabbitmq) before they are turned into real services
+// Conf stores urls and paramaters for various services before being turned into an environment
 type Conf struct {
 	ApiKey   string
 	WorkerNo int
-	Db       *sql.DB
-	//Redis  redis.Client
+	DBURL    string
+	MQURL    string
+	//RURL     string
 }
 
 // Env stores abstracted services for dealing with data
 type Env struct {
-	ApiKey    string
-	WorkerNo  int
-	Trips     static.TripStore
-	StopTimes static.StopTimeStore
-	Routes    static.RouteStore
-	Log       *log.Logger
+	db           *sql.DB
+	apikey       string
+	WorkerNo     int
+	Trips        static.TripStore
+	StopTimes    static.StopTimeStore
+	Routes       static.RouteStore
+	Notification notify.Notifier
+	Log          *log.Logger
 }
 
 // EnvFromConf returns an env from a given conf
-func EnvFromConf(conf Conf) Env {
-	return Env{
-		ApiKey:    conf.ApiKey,
-		Trips:     static.TripServiceInit(conf.Db),
-		StopTimes: static.StopTimeServiceInit(conf.Db),
-		Routes:    static.RouteServiceInit(conf.Db),
-		WorkerNo:  conf.WorkerNo,
-		Log:       log.New(),
+func EnvFromConf(conf Conf) (Env, error) {
+	l := log.New()
+
+	db, err := sql.Open("postgres", conf.DBURL)
+
+	if err != nil {
+		l.WithField("err", err).Fatalf("Failed to open db connection")
 	}
+
+	if err := db.Ping(); err != nil {
+		l.Fatal(err)
+	}
+
+	n, err := notify.InitService(conf.MQURL)
+
+	if err != nil {
+		return Env{}, err
+	}
+
+	return Env{
+		db:           db,
+		apikey:       conf.ApiKey,
+		Trips:        static.TripServiceInit(db),
+		StopTimes:    static.StopTimeServiceInit(db),
+		Routes:       static.RouteServiceInit(db),
+		WorkerNo:     conf.WorkerNo,
+		Notification: n,
+		Log:          l,
+	}, nil
 }
 
 // Start contains our main loop for calling the realtime api and extracting info
@@ -105,9 +130,15 @@ func (env *Env) Start() error {
 	return nil
 }
 
+// Done should be called when you are done with execution in order to clean up connections
+func (env *Env) Done() {
+	env.Notification.Close()
+	env.db.Close()
+}
+
 // GetRealtimeTripUpdates calls the Trip Update api with the url and key from the env
 func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
-	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/tripupdates?api_key=%v", env.ApiKey)
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/tripupdates?api_key=%v", env.apikey)
 
 	resp, err := http.Get(urlWithKey)
 
@@ -138,7 +169,7 @@ func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 }
 
 func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
-	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/vehiclelocations?api_key=%v", env.ApiKey)
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/vehiclelocations?api_key=%v", env.apikey)
 
 	resp, err := http.Get(urlWithKey)
 
@@ -172,7 +203,7 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, wg *sync.WaitGroup)
 
 	for e := range ec {
 
-		// At this point, we don't care about normal entities, we just want to know whats running late
+		// At this point, we don't care about normal entities, we just want to know whats running late or early
 		if !e.IsAbnormal() {
 			continue
 		}
@@ -205,7 +236,7 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, wg *sync.WaitGroup)
 			// not the one the trip is departing from.
 
 			// Some trips appear to be departing from their final stop which is causing line 214 to panic.
-			// Currently _trying_ to capture one of these events in logging and/or recovering further up in the execution
+			// Currently _trying_ to capture one of these events in logging. We are recovering further up in the execution
 			if e.Update.StopUpdate.StopSequence > len(sts)-1 {
 				env.Log.WithFields(log.Fields{
 					"sts":      sts,
@@ -225,12 +256,29 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, wg *sync.WaitGroup)
 
 		ot := createOutputTrip(sr, st, nextSt, e)
 
-		if e.IsAbnormal() {
-			//notify
-			//send to delays
+		nt := output.Notification{
+			TripID:     ot.TripID,
+			StopTimeID: nextSt.TripID,
+			Delay:      ot.NextStop.Delay,
+			Lat:        ot.Lat,
+			Lon:        ot.Lon,
 		}
 
-		fmt.Printf("%v - Next Stop %v. Scheduled: %v Eta %v Delay %v \n", ot.RouteLongName, ot.NextStop.Name, ot.NextStop.ScheduledArrival, ot.NextStop.Eta, ot.NextStop.Delay)
+		ntjson, err := nt.ToJSON()
+
+		if err != nil {
+			env.Log.WithField("err", err).Errorf("Failed to marshal notification struct")
+			continue
+		}
+
+		err = env.Notification.Send(ntjson)
+
+		if err != nil {
+			env.Log.WithField("err", err).Errorf("Failed to send notification")
+			continue
+		}
+
+		// delays
 	}
 }
 

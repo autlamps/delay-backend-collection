@@ -11,6 +11,7 @@ import (
 
 	"database/sql"
 
+	"github.com/autlamps/delay-backend-collection/naming"
 	"github.com/autlamps/delay-backend-collection/notify"
 	"github.com/autlamps/delay-backend-collection/objstore"
 	"github.com/autlamps/delay-backend-collection/output"
@@ -32,6 +33,7 @@ type Conf struct {
 type Env struct {
 	db           *sql.DB
 	apikey       string
+	execname     string
 	WorkerNo     int
 	Trips        static.TripStore
 	StopTimes    static.StopTimeStore
@@ -49,10 +51,12 @@ func EnvFromConf(conf Conf) (Env, error) {
 
 	if err != nil {
 		l.WithField("err", err).Fatalf("Failed to open db connection")
+		return Env{}, fmt.Errorf("Failed to open db connection: %v", err)
 	}
 
 	if err := db.Ping(); err != nil {
 		l.Fatal(err)
+		return Env{}, fmt.Errorf("Failed to ping db connection: %v", err)
 	}
 
 	n, err := notify.InitService(conf.MQURL)
@@ -80,14 +84,41 @@ func EnvFromConf(conf Conf) (Env, error) {
 	}, nil
 }
 
-// Start contains our main loop for calling the realtime api and extracting info
-func (env *Env) Start() error {
+// Start contains our main loop for calling run
+func (env *Env) Start(done <-chan bool, wg *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			env.Log.WithField("r", r).Errorf("Recovered from panic!")
 		}
 	}()
 
+	for {
+		select {
+		case <-done:
+			env.Log.Infof("Exiting Start Loop")
+			wg.Done()
+			return
+		default:
+			// We give a human readable name to every execution of Run, this allows us to track the source of events
+			// and errors in our logs more easily. These names aren't necessarily unique but it doesn't really mater.
+			env.execname = naming.GetRandomName()
+
+			env.Log.Infof("%v - Starting collection", env.execname)
+			err := env.Run()
+
+			if err != nil {
+				env.Log.WithField("err", err).Errorf("%v - Error occurred in run", env.execname)
+			}
+
+			env.Log.Infof("%v - Finished collection", env.execname)
+		}
+	}
+}
+
+// Run is the act of running one "collection" it calls the realtime apis, combines the data. Adds context to the data,
+// determines if a trip is running late, notifies the notification service of the trip running late and finally
+// outputs a list of all trips running late.
+func (env *Env) Run() error {
 	turc := make(chan TripUpdateResult)
 	vlrc := make(chan VehicleLocationResult)
 
@@ -140,7 +171,7 @@ func (env *Env) Start() error {
 	close(oc)
 
 	out := output.Out{
-		ExecName:   "",
+		ExecName:   env.execname,
 		Created:    time.Now().Unix(),
 		ValidUntil: time.Now().Add(time.Duration(30) * time.Second).Unix(),
 		Count:      0,
@@ -182,13 +213,13 @@ func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		env.Log.WithField("err", err).Error("Failed to call realtime trip updates api")
+		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime trip updates api", env.execname)
 		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
 	}
 
 	if resp.StatusCode == 403 {
 		// TODO: review whether or not this should halt execution
-		env.Log.WithField("resp", resp).Fatal("Incorrect api key used to call trip updates api")
+		env.Log.WithField("resp", resp).Fatal("%v - Incorrect api key used to call trip updates api", env.execname)
 		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
 
 	}
@@ -200,7 +231,7 @@ func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 	err = decoder.Decode(&tu)
 
 	if err != nil {
-		env.Log.WithField("err", err).Error("Failed to decode trip update json response")
+		env.Log.WithField("err", err).Errorf("%v - Failed to decode trip update json response", env.execname)
 		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
 	}
 
@@ -213,13 +244,13 @@ func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		env.Log.WithField("err", err).Error("Failed to call realtime vehiclelocations api")
+		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime vehiclelocations api", env.execname)
 		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
 	}
 
 	if resp.StatusCode == 403 {
 		// TODO: review whether or not this should halt execution
-		env.Log.WithField("resp", resp).Fatal("Incorrect api key used to call vehicle locations api")
+		env.Log.WithField("resp", resp).Fatalf("%v - Incorrect api key used to call vehicle locations api", env.execname)
 		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
 	}
 
@@ -230,7 +261,7 @@ func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
 	err = decoder.Decode(&vl)
 
 	if err != nil {
-		env.Log.WithField("err", err).Error("Failed to decode vehicle location json response")
+		env.Log.WithField("err", err).Errorf("%v - Failed to decode vehicle location json response", env.execname)
 		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
 	}
 
@@ -250,21 +281,21 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 		st, err := env.Trips.GetTripByGTFSID(e.Update.Trip.TripID)
 
 		if err != nil {
-			env.Log.WithField("err", err).Errorf("Failed to get trip from database")
+			env.Log.WithField("err", err).Errorf("%v - Failed to get trip from database", env.execname)
 			continue
 		}
 
 		sr, err := env.Routes.GetRouteByID(st.RouteID)
 
 		if err != nil {
-			env.Log.WithFields(log.Fields{"err": err, "trip-id": st.ID}).Errorf("Failed to get route from database")
+			env.Log.WithFields(log.Fields{"err": err, "trip-id": st.ID}).Errorf("%v - Failed to get route from database", env.execname)
 			continue
 		}
 
 		sts, err := env.StopTimes.GetStopsByTripID(st.ID)
 
 		if err != nil {
-			env.Log.WithFields(log.Fields{"err": err, "trip-id": st.ID}).Errorf("Failed to get stoptimes from database")
+			env.Log.WithFields(log.Fields{"err": err, "trip-id": st.ID}).Errorf("%v - Failed to get stoptimes from database", env.execname)
 			continue
 		}
 
@@ -282,7 +313,7 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 					"stop_seq": e.Update.StopUpdate.StopSequence,
 					"len(sts)": len(sts),
 					"entity":   e,
-				}).Errorf("Trying to access a stop sequence greater than the index for the number of stops")
+				}).Errorf("%v - Trying to access a stop sequence greater than the index for the number of stops", env.execname)
 
 				continue
 			}
@@ -306,14 +337,14 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 		ntjson, err := nt.ToJSON()
 
 		if err != nil {
-			env.Log.WithField("err", err).Errorf("Failed to marshal notification struct")
+			env.Log.WithField("err", err).Errorf("%v - Failed to marshal notification struct", env.execname)
 			continue
 		}
 
 		err = env.Notification.Send(ntjson)
 
 		if err != nil {
-			env.Log.WithField("err", err).Errorf("Failed to send notification")
+			env.Log.WithField("err", err).Errorf("%v - Failed to send notification", env.execname)
 			continue
 		}
 

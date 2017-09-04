@@ -12,6 +12,7 @@ import (
 // Store defines the methods needed for our concrete objstore service
 type Store interface {
 	Save(k string, v []byte, t int) error
+	Close()
 }
 
 // Service is our redis implementation of the store interface
@@ -41,4 +42,9 @@ func InitService(rdURL string) (*Service, error) {
 // Save saves the given data to our objstore with the given timeout in seconds, 0 seconds for no timeout
 func (s *Service) Save(k string, v []byte, t int) error {
 	return s.rd.Set(k, v, time.Duration(t)*time.Second).Err()
+}
+
+// Close closes our underlying redis connection
+func (s *Service) Close() {
+	s.rd.Close()
 }

@@ -84,8 +84,11 @@ func EnvFromConf(conf Conf) (Env, error) {
 	}, nil
 }
 
-// Start contains our main loop for calling run
-func (env *Env) Start(done <-chan bool, wg *sync.WaitGroup) {
+// Start contains our main loop for calling run. To stop the loop pass a bool over exit, start will then send a bool
+// over finished once completed.
+func (env *Env) Start(exit <-chan bool, finished chan<- bool) {
+	first := true
+
 	defer func() {
 		if r := recover(); r != nil {
 			env.Log.WithField("r", r).Errorf("Recovered from panic!")
@@ -94,11 +97,20 @@ func (env *Env) Start(done <-chan bool, wg *sync.WaitGroup) {
 
 	for {
 		select {
-		case <-done:
+		case <-exit:
 			env.Log.Infof("Exiting Start Loop")
-			wg.Done()
+			finished <- true
 			return
 		default:
+			if !first {
+				// Sleep at the top so we exit sooner if we receive a value on exit
+				time.Sleep(30 * time.Second)
+			} else {
+				first = false
+			}
+
+			start := time.Now()
+
 			// We give a human readable name to every execution of Run, this allows us to track the source of events
 			// and errors in our logs more easily. These names aren't necessarily unique but it doesn't really mater.
 			env.execname = naming.GetRandomName()
@@ -110,12 +122,12 @@ func (env *Env) Start(done <-chan bool, wg *sync.WaitGroup) {
 				env.Log.WithField("err", err).Errorf("%v - Error occurred in run", env.execname)
 			}
 
-			env.Log.Infof("%v - Finished collection", env.execname)
+			env.Log.Infof("%v - Finished collection in %v", env.execname, time.Now().Sub(start))
 		}
 	}
 }
 
-// Run is the act of running one "collection" it calls the realtime apis, combines the data. Adds context to the data,
+// Run is the act of running one "collection" it calls the realtime apis, combines the data, adds context to the data,
 // determines if a trip is running late, notifies the notification service of the trip running late and finally
 // outputs a list of all trips running late.
 func (env *Env) Run() error {

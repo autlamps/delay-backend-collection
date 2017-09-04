@@ -309,7 +309,7 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 			continue
 		}
 
-		sts, err := env.StopTimes.GetStopsByTripID(st.ID)
+		sts, err := env.StopTimes.GetStopTimesByTripID(st.ID)
 
 		if err != nil {
 			env.Log.WithFields(log.Fields{"err": err, "trip-id": st.ID}).Errorf("%v - Failed to get stoptimes from database", env.execname)

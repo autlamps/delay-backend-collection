@@ -28,7 +28,8 @@ type StopTimeArray []StopTime
 
 // StopTimeStore defines the methods that a concrete StopTimeService should implement
 type StopTimeStore interface {
-	GetStopsByTripID(tripID string) (StopTimeArray, error)
+	GetStopTimesByTripID(tripID string) (StopTimeArray, error)
+	getStopByID(id string) (Stop, error)
 }
 
 // StopTimeService implements StopTimeStore in PSQL
@@ -41,11 +42,12 @@ func StopTimeServiceInit(db *sql.DB) *StopTimeService {
 	return &StopTimeService{db: db}
 }
 
-// GetStopsByTripID returns all stops of the given trip
-func (sts *StopTimeService) GetStopsByTripID(tripID string) (StopTimeArray, error) {
+// GetStopTimesByTripID returns all stops of the given trip
+func (sts *StopTimeService) GetStopTimesByTripID(tripID string) (StopTimeArray, error) {
 	var sta StopTimeArray
 
-	rows, err := sts.db.Query("SELECT stoptime_id, trip_id, arrival_time, departure_time, stop_id, stop_sequence from stop_times WHERE trip_id = $1", tripID)
+	rows, err := sts.db.Query("SELECT stoptime_id, trip_id, arrival_time, departure_time, stop_id, "+
+		"stop_sequence from stop_times WHERE trip_id = $1 ORDER BY stop_sequence ASC", tripID)
 
 	if err != nil {
 		return sta, err

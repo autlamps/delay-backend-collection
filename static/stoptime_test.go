@@ -58,7 +58,7 @@ func TestStopTimeService_GetStopsByTripID(t *testing.T) {
 	for _, test := range tests {
 		var sta StopTimeArray
 
-		sta, err := sts.GetStopsByTripID(test.in)
+		sta, err := sts.GetStopTimesByTripID(test.in)
 
 		if err != nil {
 			t.Errorf("Failed to retrieve stoptimes %v", err)

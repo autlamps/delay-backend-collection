@@ -11,6 +11,8 @@ import (
 
 	"fmt"
 
+	"strconv"
+
 	"github.com/autlamps/delay-backend-collection/collection"
 	_ "github.com/lib/pq"
 )
@@ -26,8 +28,12 @@ func init() {
 	flag.StringVar(&dburl, "DB_URL", "", "database url")
 	flag.StringVar(&mqurl, "MQ_URL", "", "message queue url")
 	flag.StringVar(&rdurl, "RD_URL", "", "redis url")
-	flag.IntVar(&workerno, "WORKERS", 2, "number of workers")
+	flag.IntVar(&workerno, "WORKERS", 0, "number of workers")
 	flag.Parse()
+
+	if apikey == "" {
+		apikey = os.Getenv("API_KEY")
+	}
 
 	if dburl == "" {
 		dburl = os.Getenv("DB_URL")
@@ -39,6 +45,16 @@ func init() {
 
 	if mqurl == "" {
 		mqurl = os.Getenv("MQ_URL")
+	}
+
+	if workerno == 0 {
+		no, err := strconv.ParseInt(os.Getenv("WORKERS"), 10, 32)
+
+		if err != nil {
+			panic(err)
+		}
+
+		workerno = int(no) // ParseInt returns an int64 but workerno is an int because flag.IntVar requires an int
 	}
 }
 

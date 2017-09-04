@@ -12,19 +12,20 @@ import (
 	"database/sql"
 
 	"github.com/autlamps/delay-backend-collection/notify"
+	"github.com/autlamps/delay-backend-collection/objstore"
 	"github.com/autlamps/delay-backend-collection/output"
 	"github.com/autlamps/delay-backend-collection/realtime"
 	"github.com/autlamps/delay-backend-collection/static"
 	log "github.com/sirupsen/logrus"
 )
 
-// Conf stores urls and paramaters for various services before being turned into an environment
+// Conf stores urls and parameters for various services before being turned into an environment
 type Conf struct {
 	ApiKey   string
 	WorkerNo int
 	DBURL    string
 	MQURL    string
-	//RURL     string
+	RDURL    string
 }
 
 // Env stores abstracted services for dealing with data
@@ -36,6 +37,7 @@ type Env struct {
 	StopTimes    static.StopTimeStore
 	Routes       static.RouteStore
 	Notification notify.Notifier
+	ObjStore     objstore.Store
 	Log          *log.Logger
 }
 
@@ -59,6 +61,12 @@ func EnvFromConf(conf Conf) (Env, error) {
 		return Env{}, err
 	}
 
+	o, err := objstore.InitService(conf.RDURL)
+
+	if err != nil {
+		return Env{}, err
+	}
+
 	return Env{
 		db:           db,
 		apikey:       conf.ApiKey,
@@ -67,6 +75,7 @@ func EnvFromConf(conf Conf) (Env, error) {
 		Routes:       static.RouteServiceInit(db),
 		WorkerNo:     conf.WorkerNo,
 		Notification: n,
+		ObjStore:     o,
 		Log:          l,
 	}, nil
 }
@@ -107,6 +116,7 @@ func (env *Env) Start() error {
 		return err
 	}
 
+	oc := make(chan output.OutTrip, 1000)
 	wc := make(chan realtime.CombEntity, 1000)
 	var wg sync.WaitGroup
 
@@ -114,7 +124,7 @@ func (env *Env) Start() error {
 
 	// Create our workers
 	for i := 0; i < env.WorkerNo; i++ {
-		go env.processEntity(wc, &wg)
+		go env.processEntity(wc, oc, &wg)
 	}
 
 	// Dispatch work
@@ -127,11 +137,40 @@ func (env *Env) Start() error {
 	// Block until all entities on the channel have been processed
 	wg.Wait()
 
+	close(oc)
+
+	out := output.Out{
+		ExecName:   "",
+		Created:    time.Now().Unix(),
+		ValidUntil: time.Now().Add(time.Duration(30) * time.Second).Unix(),
+		Count:      0,
+	}
+
+	// Add all our processed ouput trips to our output struct
+	for o := range oc {
+		out.Trips = append(out.Trips, o)
+		out.Count++
+	}
+
+	ojsn, err := out.ToJSON()
+
+	if err != nil {
+		return err
+	}
+
+	// Currently setting delays key to expire after 40 seconds
+	err = env.ObjStore.Save("delays", ojsn, 40)
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // Done should be called when you are done with execution in order to clean up connections
 func (env *Env) Done() {
+	env.ObjStore.Close()
 	env.Notification.Close()
 	env.db.Close()
 }
@@ -198,7 +237,7 @@ func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
 	rc <- VehicleLocationResult{vl, nil}
 }
 
-func (env *Env) processEntity(ec <-chan realtime.CombEntity, wg *sync.WaitGroup) {
+func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.OutTrip, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for e := range ec {
@@ -278,7 +317,8 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, wg *sync.WaitGroup)
 			continue
 		}
 
-		// delays
+		// Send our final output trip to the output channel
+		oc <- ot
 	}
 }
 

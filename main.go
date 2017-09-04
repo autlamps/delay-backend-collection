@@ -73,11 +73,9 @@ func main() {
 	// This is done because Start takes a bool channel for it's exit channel and this seemed nicer/more reusable
 	// than changing Start to take in a os.Signal channel
 	go func() {
-		select {
-		case <-sc:
-			fmt.Println("Exit signal recieved")
-			ec <- true
-		}
+		<-sc
+		fmt.Println("Exit signal recieved")
+		ec <- true
 	}()
 
 	go env.Start(ec, fc)

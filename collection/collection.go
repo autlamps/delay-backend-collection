@@ -206,11 +206,16 @@ func (env *Env) Done() {
 	env.db.Close()
 }
 
+// Custom http client with a timeout
+var httpclient = http.Client{
+	Timeout: 20 * time.Second,
+}
+
 // GetRealtimeTripUpdates calls the Trip Update api with the url and key from the env
 func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/tripupdates?api_key=%v", env.apikey)
 
-	resp, err := http.Get(urlWithKey)
+	resp, err := httpclient.Get(urlWithKey)
 
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime trip updates api", env.execname)
@@ -241,7 +246,7 @@ func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/vehiclelocations?api_key=%v", env.apikey)
 
-	resp, err := http.Get(urlWithKey)
+	resp, err := httpclient.Get(urlWithKey)
 
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime vehiclelocations api", env.execname)

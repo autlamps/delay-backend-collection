@@ -1,36 +1,86 @@
 package main
 
 import (
+	"runtime"
+
+	"flag"
+	"os"
+
+	"os/signal"
+	"syscall"
+
 	"fmt"
-	"time"
 
 	"github.com/autlamps/delay-backend-collection/collection"
 	_ "github.com/lib/pq"
 )
 
+var mqurl string
+var dburl string
+var apikey string
+var rdurl string
+var workerno int
+
+func init() {
+	flag.StringVar(&apikey, "API_KEY", "", "AT api key")
+	flag.StringVar(&dburl, "DB_URL", "", "database url")
+	flag.StringVar(&mqurl, "MQ_URL", "", "message queue url")
+	flag.StringVar(&rdurl, "RD_URL", "", "redis url")
+	flag.IntVar(&workerno, "WORKERS", 2, "number of workers")
+	flag.Parse()
+
+	if dburl == "" {
+		dburl = os.Getenv("DB_URL")
+	}
+
+	if rdurl == "" {
+		rdurl = os.Getenv("RD_URL")
+	}
+
+	if mqurl == "" {
+		mqurl = os.Getenv("MQ_URL")
+	}
+}
+
 func main() {
-	// Shell main for dev purposes, this is not how it will look!
-	//runtime.GOMAXPROCS(runtime.NumCPU())
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	t := time.Now()
+	conf := collection.Conf{
+		DBURL:    dburl,
+		ApiKey:   apikey,
+		WorkerNo: workerno,
+		MQURL:    mqurl,
+		RDURL:    rdurl,
+	}
 
-	// TODO: move this to a proper env variable and a correct location
-	apiKey := ""
-
-	conf := collection.Conf{DBURL: "postgresql://postgres:mysecretpassword@172.17.0.2/postgres?sslmode=disable", ApiKey: apiKey, WorkerNo: 2, MQURL: "amqp://guest:guest@172.17.0.3:5672/"}
 	env, err := collection.EnvFromConf(conf)
 
 	if err != nil {
 		panic(err)
 	}
 
-	err = env.Start()
+	// Exit channel used to signal env.Start that we want to stop executing after the current collection
+	// is done
+	ec := make(chan bool)
 
-	if err != nil {
-		fmt.Println(err)
-	}
+	// Our blocking channel. Start sends true down this once it is ready to exit
+	fc := make(chan bool)
 
-	env.Done()
+	sc := make(chan os.Signal)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM)
 
-	fmt.Printf("Runtime: %v", time.Now().Sub(t))
+	// This func on receiving the syscall signal from the channel sends true down our exit channel.
+	// This is done because Start takes a bool channel for it's exit channel and this seemed nicer/more reusable
+	// than changing Start to take in a os.Signal channel
+	go func() {
+		select {
+		case <-sc:
+			fmt.Println("Exit signal recieved")
+			ec <- true
+		}
+	}()
+
+	go env.Start(ec, fc)
+
+	<-fc
 }

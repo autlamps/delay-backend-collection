@@ -18,6 +18,7 @@ type StopTime struct {
 // Stop represents a physical stop. Embedded into StopTime instead of being its own service for ease of use
 type Stop struct {
 	ID   string
+	Code string
 	Name string
 	Lat  float64
 	Lon  float64
@@ -77,9 +78,9 @@ func (sts *StopTimeService) GetStopTimesByTripID(tripID string) (StopTimeArray, 
 func (sts *StopTimeService) getStopByID(id string) (Stop, error) {
 	s := Stop{}
 
-	row := sts.db.QueryRow("SELECT stop_id, stop_name, stop_lat, stop_lon FROM stops WHERE stop_id = $1", id)
+	row := sts.db.QueryRow("SELECT stop_id, stop_code, stop_name, stop_lat, stop_lon FROM stops WHERE stop_id = $1", id)
 
-	err := row.Scan(&s.ID, &s.Name, &s.Lat, &s.Lon)
+	err := row.Scan(&s.ID, &s.Code, &s.Name, &s.Lat, &s.Lon)
 
 	if err != nil {
 		return s, err

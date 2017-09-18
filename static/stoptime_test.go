@@ -29,28 +29,30 @@ func TestStopTimeService_GetStopsByTripID(t *testing.T) {
 		in       string
 		expected []StopTime
 	}{
-		{"cfa551f2-6f1c-41c3-87d2-6d33b971b41b", StopTimeArray{
-			{"a8a77177-6049-40a3-905a-38b8745bf8c7",
-				"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
-				time.Date(0, 1, 1, 06, 45, 0, 0, time.UTC),
-				time.Date(0, 1, 1, 06, 45, 0, 0, time.UTC),
+		{"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758", StopTimeArray{
+			{"847af420-5527-49b1-85f0-9a18fb143d87",
+				"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
+				time.Date(0, 1, 1, 14, 45, 0, 0, time.UTC),
+				time.Date(0, 1, 1, 14, 45, 0, 0, time.UTC),
 				1,
 				Stop{
-					"c8d731d1-2e1c-4ca2-ac26-fead1695320d",
-					"Downtown Ferry Terminal Pier 1",
-					-36.84243,
-					174.76708,
-				}},
-			{"8e89b74f-7cb2-4c33-b9a4-cf937a30ecb1",
-				"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
-				time.Date(0, 1, 1, 06, 55, 0, 0, time.UTC),
-				time.Date(0, 1, 1, 06, 55, 0, 0, time.UTC),
-				2,
-				Stop{
-					"295a2c04-41f8-46f7-9904-020a51b92955",
+					"67cca212-476a-4e60-bf25-8bc5318c3d23",
+					"9670",
 					"Devonport Ferry Terminal",
 					-36.83317,
 					174.7954,
+				}},
+			{"532789a3-1abb-4d48-886e-24212998212a",
+				"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
+				time.Date(0, 1, 1, 14, 55, 0, 0, time.UTC),
+				time.Date(0, 1, 1, 14, 55, 0, 0, time.UTC),
+				2,
+				Stop{
+					"c8e15bd6-0066-4840-8c37-5f8b1bcb0f6c",
+					"9600",
+					"Downtown Ferry Terminal Pier 1",
+					-36.84243,
+					174.76708,
 				}},
 		}},
 	}
@@ -72,14 +74,16 @@ func TestStopTimeService_GetStopsByTripID(t *testing.T) {
 
 func TestStop_IsEqual(t *testing.T) {
 	s1 := Stop{
-		"c8d731d1-2e1c-4ca2-ac26-fead1695320d",
+		"c8e15bd6-0066-4840-8c37-5f8b1bcb0f6c",
+		"9600",
 		"Downtown Ferry Terminal Pier 1",
 		-36.84243,
 		174.76708,
 	}
 
 	s2 := Stop{
-		"c8d731d1-2e1c-4ca2-ac26-fead1695320d",
+		"c8e15bd6-0066-4840-8c37-5f8b1bcb0f6c",
+		"9600",
 		"Downtown Ferry Terminal Pier 1",
 		-36.84243,
 		174.76708,
@@ -91,25 +95,27 @@ func TestStop_IsEqual(t *testing.T) {
 }
 
 func TestStopTime_IsEqual(t *testing.T) {
-	st1 := StopTime{"a8a77177-6049-40a3-905a-38b8745bf8c7",
-		"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
+	st1 := StopTime{"847af420-5527-49b1-85f0-9a18fb143d87",
+		"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
 		time.Date(0, 0, 0, 06, 45, 0, 0, time.UTC),
 		time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 		1,
 		Stop{
 			"c8d731d1-2e1c-4ca2-ac26-fead1695320d",
+			"9600",
 			"Downtown Ferry Terminal Pier 1",
 			-36.84243,
 			174.76708,
 		}}
 
-	st2 := StopTime{"a8a77177-6049-40a3-905a-38b8745bf8c7",
-		"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
+	st2 := StopTime{"847af420-5527-49b1-85f0-9a18fb143d87",
+		"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
 		time.Date(0, 0, 0, 06, 45, 0, 0, time.UTC),
 		time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 		1,
 		Stop{
 			"c8d731d1-2e1c-4ca2-ac26-fead1695320d",
+			"9600",
 			"Downtown Ferry Terminal Pier 1",
 			-36.84243,
 			174.76708,
@@ -122,24 +128,26 @@ func TestStopTime_IsEqual(t *testing.T) {
 
 func TestStopTimes_IsEqual(t *testing.T) {
 	st1 := StopTimeArray{
-		{"a8a77177-6049-40a3-905a-38b8745bf8c7",
-			"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
+		{"847af420-5527-49b1-85f0-9a18fb143d87",
+			"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
 			time.Date(0, 0, 0, 06, 45, 0, 0, time.UTC),
 			time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 			1,
 			Stop{
 				"c8d731d1-2e1c-4ca2-ac26-fead1695320d",
+				"9600",
 				"Downtown Ferry Terminal Pier 1",
 				-36.84243,
 				174.76708,
 			}},
 		{"8e89b74f-7cb2-4c33-b9a4-cf937a30ecb1",
-			"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
+			"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
 			time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 			time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 			2,
 			Stop{
 				"295a2c04-41f8-46f7-9904-020a51b92955",
+				"9670",
 				"Devonport Ferry Terminal",
 				-36.83317,
 				174.7954,
@@ -147,24 +155,26 @@ func TestStopTimes_IsEqual(t *testing.T) {
 	}
 
 	st2 := StopTimeArray{
-		{"a8a77177-6049-40a3-905a-38b8745bf8c7",
-			"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
+		{"847af420-5527-49b1-85f0-9a18fb143d87",
+			"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
 			time.Date(0, 0, 0, 06, 45, 0, 0, time.UTC),
 			time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 			1,
 			Stop{
 				"c8d731d1-2e1c-4ca2-ac26-fead1695320d",
+				"9600",
 				"Downtown Ferry Terminal Pier 1",
 				-36.84243,
 				174.76708,
 			}},
 		{"8e89b74f-7cb2-4c33-b9a4-cf937a30ecb1",
-			"cfa551f2-6f1c-41c3-87d2-6d33b971b41b",
+			"d0d6dece-e75d-4e1a-8bbc-7eefd6a07758",
 			time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 			time.Date(0, 0, 0, 06, 55, 0, 0, time.UTC),
 			2,
 			Stop{
 				"295a2c04-41f8-46f7-9904-020a51b92955",
+				"9670",
 				"Devonport Ferry Terminal",
 				-36.83317,
 				174.7954,

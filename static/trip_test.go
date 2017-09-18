@@ -25,11 +25,11 @@ func TestTripService_GetTripByGTFSID(t *testing.T) {
 		id       string
 		expected Trip
 	}{
-		{"1080081195-20170807091914_v56.25",
-			Trip{ID: "f5efea1b-60e7-4239-a6e7-47d14a858399",
-				RouteID:   "0f6775a1-ce65-4e6e-82ba-f94e599a1a57",
-				ServiceID: "069423ce-9866-4796-b6ad-8eeb8ad87f2a",
-				GTFSID:    "1080081195-20170807091914_v56.25",
+		{"13223097957-20170829094406_v57.13",
+			Trip{ID: "236a9757-6aeb-49e9-ad7c-c56d660a10ed",
+				RouteID:   "3dd07748-5586-4edf-a714-f7ba4999af7e",
+				ServiceID: "b49995c1-22f4-40d6-8996-245d0f7b4f89",
+				GTFSID:    "13223097957-20170829094406_v57.13",
 				Headsign:  "City Centre"}},
 	}
 

@@ -23,10 +23,10 @@ func TestRouteService_GetRouteByID(t *testing.T) {
 		id       string
 		expected Route
 	}{
-		{"3ad6312a-9a56-4bd5-9b89-4c0b9687db95",
-			Route{"3ad6312a-9a56-4bd5-9b89-4c0b9687db95",
-				"12014-20170724124507_v56.18",
-				"09e076cf-e471-453e-adcc-3da322502160",
+		{"42d70439-930a-4149-b690-37010dbf36ea",
+			Route{"42d70439-930a-4149-b690-37010dbf36ea",
+				"12014-20170829094406_v57.13",
+				"cb90705c-32b2-4c27-a808-a0d519548b8c",
 				"120",
 				"Akoranga to Henderson"}},
 	}

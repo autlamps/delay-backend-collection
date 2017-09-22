@@ -225,9 +225,10 @@ var httpclient = http.Client{
 
 // GetRealtimeTripUpdates calls the Trip Update api with the url and key from the env
 func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
-	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/tripupdates?api_key=%v", env.apikey)
+	req, _ := http.NewRequest("GET", "http://api.at.govt.nz/v2/public/realtime/tripupdates", nil)
+	req.Header.Set("Ocp-Apim-Subscription-Key", env.apikey)
 
-	resp, err := httpclient.Get(urlWithKey)
+	resp, err := httpclient.Do(req)
 
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime trip updates api", env.execname)
@@ -256,9 +257,10 @@ func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 }
 
 func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
-	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/public/realtime/vehiclelocations?api_key=%v", env.apikey)
+	req, _ := http.NewRequest("GET", "http://api.at.govt.nz/v2/public/realtime/vehiclelocations", nil)
+	req.Header.Set("Ocp-Apim-Subscription-Key", env.apikey)
 
-	resp, err := httpclient.Get(urlWithKey)
+	resp, err := httpclient.Do(req)
 
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime vehiclelocations api", env.execname)

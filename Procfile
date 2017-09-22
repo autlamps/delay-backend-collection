@@ -1,1 +1,1 @@
-worker: delay-backend-collection
+web: delay-backend-collection

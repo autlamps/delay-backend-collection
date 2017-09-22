@@ -202,7 +202,7 @@ func (env *Env) Run() error {
 	}
 
 	// Currently setting delays key to expire after 40 seconds
-	err = env.ObjStore.Save("delays", ojsn, 40)
+	err = env.ObjStore.Save("delays", ojsn, 120)
 
 	if err != nil {
 		return err

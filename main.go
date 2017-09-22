@@ -25,9 +25,9 @@ var workerno int
 
 func init() {
 	flag.StringVar(&apikey, "API_KEY", "", "AT api key")
-	flag.StringVar(&dburl, "DB_URL", "", "database url")
-	flag.StringVar(&mqurl, "MQ_URL", "", "message queue url")
-	flag.StringVar(&rdurl, "RD_URL", "", "redis url")
+	flag.StringVar(&dburl, "DATABASE_URL", "", "database url")
+	flag.StringVar(&mqurl, "RABBITMQ_URL", "", "message queue url")
+	flag.StringVar(&rdurl, "REDIS_URL", "", "redis url")
 	flag.IntVar(&workerno, "WORKERS", 0, "number of workers")
 	flag.Parse()
 
@@ -36,15 +36,15 @@ func init() {
 	}
 
 	if dburl == "" {
-		dburl = os.Getenv("DB_URL")
+		dburl = os.Getenv("DATABASE_URL")
 	}
 
 	if rdurl == "" {
-		rdurl = os.Getenv("RD_URL")
+		rdurl = os.Getenv("REDIS_URL")
 	}
 
 	if mqurl == "" {
-		mqurl = os.Getenv("MQ_URL")
+		mqurl = os.Getenv("RABBITMQ_URL")
 	}
 
 	if workerno == 0 {

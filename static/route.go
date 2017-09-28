@@ -9,6 +9,7 @@ type Route struct {
 	AgencyID  string
 	ShortName string
 	LongName  string
+	RouteType int
 }
 
 // RouteStore defines methods that a concrete implementation should implement
@@ -30,8 +31,8 @@ func RouteServiceInit(db *sql.DB) *RouteService {
 func (rs *RouteService) GetRouteByID(id string) (Route, error) {
 	r := Route{}
 
-	row := rs.db.QueryRow("SELECT route_id, gtfs_route_id, agency_id, route_short_name, route_long_name FROM routes where route_id = $1", id)
-	err := row.Scan(&r.ID, &r.GTFSID, &r.AgencyID, &r.ShortName, &r.LongName)
+	row := rs.db.QueryRow("SELECT route_id, gtfs_route_id, agency_id, route_short_name, route_long_name, route_type FROM routes where route_id = $1", id)
+	err := row.Scan(&r.ID, &r.GTFSID, &r.AgencyID, &r.ShortName, &r.LongName, &r.RouteType)
 
 	if err != nil {
 		return r, err
@@ -60,6 +61,10 @@ func (r Route) IsEqual(x Route) bool {
 	}
 
 	if r.LongName != x.LongName {
+		return false
+	}
+
+	if r.RouteType != x.RouteType {
 		return false
 	}
 

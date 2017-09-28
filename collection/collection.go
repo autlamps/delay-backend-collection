@@ -233,13 +233,14 @@ func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime trip updates api", env.execname)
 		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
+		return
 	}
 
 	if resp.StatusCode == 403 {
 		// TODO: review whether or not this should halt execution
 		env.Log.WithField("resp", resp).Fatal("%v - Incorrect api key used to call trip updates api", env.execname)
 		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
-
+		return
 	}
 
 	var tu realtime.TUAPIResponse
@@ -251,6 +252,7 @@ func (env *Env) GetRealtimeTripUpdates(rc chan<- TripUpdateResult) {
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to decode trip update json response", env.execname)
 		rc <- TripUpdateResult{realtime.TUAPIResponse{}, err}
+		return
 	}
 
 	rc <- TripUpdateResult{tu, nil}
@@ -265,12 +267,14 @@ func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to call realtime vehiclelocations api", env.execname)
 		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
+		return
 	}
 
 	if resp.StatusCode == 403 {
 		// TODO: review whether or not this should halt execution
 		env.Log.WithField("resp", resp).Fatalf("%v - Incorrect api key used to call vehicle locations api", env.execname)
 		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
+		return
 	}
 
 	var vl realtime.VLAPIResponse
@@ -282,6 +286,7 @@ func (env *Env) GetRealtimeVehicleLocations(rc chan<- VehicleLocationResult) {
 	if err != nil {
 		env.Log.WithField("err", err).Errorf("%v - Failed to decode vehicle location json response", env.execname)
 		rc <- VehicleLocationResult{realtime.VLAPIResponse{}, err}
+		return
 	}
 
 	rc <- VehicleLocationResult{vl, nil}

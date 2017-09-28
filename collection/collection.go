@@ -397,6 +397,7 @@ func createOutputTrip(r static.Route, t static.Trip, nxtst static.StopTime, cmb 
 		RouteLongName:  r.LongName,
 		RouteShortName: r.ShortName,
 		VehicleID:      cmb.TUEntity.Update.Vehicle.ID,
+		VehicleType:    r.RouteType,
 		Lat:            cmb.Position.Lat,
 		Lon:            cmb.Position.Lon,
 		NextStop:       next,

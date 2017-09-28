@@ -15,6 +15,7 @@ type OutTrip struct {
 	RouteShortName string   `json:"route_short_name"`
 	NextStop       NextStop `json:"next_stop"`
 	VehicleID      string   `json:"vehicle_id"`
+	VehicleType    int      `json:"vehicle_type"`
 	Lat            float64  `json:"lat"`
 	Lon            float64  `json:"lon"`
 }

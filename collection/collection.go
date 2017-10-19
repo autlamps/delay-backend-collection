@@ -352,10 +352,13 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 
 		nt := output.Notification{
 			TripID:     ot.TripID,
-			StopTimeID: nextSt.TripID,
+			StopTimeID: nextSt.ID,
 			Delay:      ot.NextStop.Delay,
 			Lat:        ot.Lat,
 			Lon:        ot.Lon,
+			Route:      sr,
+			Trip:       st,
+			StopTimes:  sts,
 		}
 
 		ntjson, err := nt.ToJSON()

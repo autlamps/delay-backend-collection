@@ -1,6 +1,10 @@
 package output
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/autlamps/delay-backend-collection/static"
+)
 
 // Models to be passed to the notification service
 
@@ -10,6 +14,9 @@ type Notification struct {
 	Delay      int
 	Lat        float64
 	Lon        float64
+	Route      static.Route
+	Trip       static.Trip
+	StopTimes  []static.StopTime
 }
 
 func (n *Notification) ToJSON() ([]byte, error) {

@@ -22,6 +22,7 @@ type OutTrip struct {
 
 // NextStop is the information for the next stop of an abnormally running service
 type NextStop struct {
+	StopTimeID       string    `json:"stoptime_id"`
 	ID               string    `json:"id"`
 	Name             string    `json:"name"`
 	Lat              float64   `json:"lat"`

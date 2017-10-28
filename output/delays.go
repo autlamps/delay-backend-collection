@@ -18,6 +18,7 @@ type OutTrip struct {
 	VehicleType    int      `json:"vehicle_type"`
 	Lat            float64  `json:"lat"`
 	Lon            float64  `json:"lon"`
+	Cancelled      bool     `json:"cancelled"`
 }
 
 // NextStop is the information for the next stop of an abnormally running service

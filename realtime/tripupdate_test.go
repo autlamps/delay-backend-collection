@@ -102,6 +102,33 @@ func TestTUEntity_IsAbnormal(t *testing.T) {
 	}
 }
 
+func TestTUEntity_IsCancelled(t *testing.T) {
+
+	tests := []struct {
+		in       string
+		expected bool
+	}{
+		{`{ "id": "e2601758-977c-e56e-287a-96107e203ac0", "is_deleted": false, "trip_update": { "trip": { "trip_id": "13221091879-20170807091914_v56.25", "route_id": "22106-20170807091914_v56.25", "schedule_relationship": 0 }, "vehicle": { "id": "3075" }, "stop_time_update": { "stop_sequence": 29, "stop_id": "8242", "schedule_relationship": 0, "arrival": { "delay": -210, "time": 1503810877.772 } }, "timestamp": 1503810877.772 } }`, false},
+		{`{ "id": "13b0524f-970d-df1f-10f5-b60fcd1bf48e", "is_deleted": false, "trip_update": { "trip": { "trip_id": "4915094780-20170807091914_v56.25", "route_id": "91506-20170807091914_v56.25", "schedule_relationship": 0 }, "vehicle": { "id": "5243" }, "stop_time_update": { "stop_sequence": 17, "stop_id": "4012", "schedule_relationship": 3, "arrival": { "delay": -433, "time": 1503810710.853 } }, "timestamp": 1503810710.853 } }`, true},
+	}
+
+	for _, test := range tests {
+
+		entity := &TUEntity{}
+
+		err := json.Unmarshal([]byte(test.in), entity)
+
+		if err != nil {
+			t.Fatalf("Failed to unmarshal: %v", err)
+		}
+
+		if test.expected != entity.IsAbnormal() {
+			t.Errorf("Canelled differs. Epxected %v, got %v. Schedule Relationship: %v", test.expected, entity.IsCancelled(),
+				entity.Update.Trip.ScheduleRelationship)
+		}
+	}
+}
+
 func TestTUStopUpdate_UnmarshalJSON(t *testing.T) {
 	loc, err := time.LoadLocation("Pacific/Auckland")
 

@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const CANCELLED int = 3
+
 // Models for response from /realtime/tripupdates endpoint
 
 // TUAPIResponse is the full response from the api
@@ -162,4 +164,9 @@ const SECONDS_ABNORMAL = 240
 // IsAbnormal returns true if the entity is running abnormally (i.e late or early), false if it is running to schedule
 func (e *TUEntity) IsAbnormal() bool {
 	return !(e.Update.StopUpdate.Event.Delay > -SECONDS_ABNORMAL && e.Update.StopUpdate.Event.Delay < SECONDS_ABNORMAL)
+}
+
+// IsCanceled returns true if the entity is canceled
+func (e *TUEntity) IsCancelled() bool {
+	return e.Update.Trip.ScheduleRelationship == CANCELLED
 }

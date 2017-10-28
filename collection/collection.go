@@ -153,17 +153,19 @@ func (env *Env) Run() error {
 		return err
 	}
 
+	oc := make(chan output.OutTrip, 1000)
+	wc := make(chan realtime.CombEntity, 1000)
+	var wg sync.WaitGroup
+	wg.Add(env.WorkerNo)
+
+	// Dispatch our cancelled work separately as we assume we don't get vehicle location for cancelled trips
+	go env.processCancelledEntity(tu.Response.Entities, oc, wg)
+
 	cmb, err := realtime.CombineTripUpdates(tu.Response.Entities, vl.Response.Entities)
 
 	if err != nil {
 		return err
 	}
-
-	oc := make(chan output.OutTrip, 1000)
-	wc := make(chan realtime.CombEntity, 1000)
-	var wg sync.WaitGroup
-
-	wg.Add(env.WorkerNo)
 
 	// Create our workers
 	for i := 0; i < env.WorkerNo; i++ {
@@ -348,7 +350,7 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 			nextSt = sts[e.Update.StopUpdate.StopSequence-1]
 		}
 
-		ot := createOutputTrip(sr, st, nextSt, e)
+		ot := createOutputTrip(sr, st, nextSt, e, false)
 
 		nt := output.Notification{
 			TripID:     ot.TripID,
@@ -380,8 +382,65 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 	}
 }
 
+func (env *Env) processCancelledEntities(tuEntities realtime.TUEntities, oc chan<- output.OutTrip, wg sync.WaitGroup) {
+	wg.Add(1)
+	defer wg.Done()
+
+	for _, e := range tuEntities {
+		if !e.IsCancelled() {
+			continue
+		}
+
+		st, err := env.Trips.GetTripByGTFSID(e.Update.Trip.TripID)
+
+		if err != nil {
+			env.Log.WithField("err", err).Errorf("%v - Failed to get trip from database", env.execname)
+			continue
+		}
+
+		sr, err := env.Routes.GetRouteByID(st.RouteID)
+
+		if err != nil {
+			env.Log.WithFields(log.Fields{"err": err, "trip-id": st.ID}).Errorf("%v - Failed to get route from database", env.execname)
+			continue
+		}
+
+		// Create empty structs to fill in the details we don't have about our cancelled trip
+		ot := createOutputTrip(sr, st, static.StopTime{}, realtime.CombEntity{e, realtime.CombPosition{}}, true)
+
+		nt := output.Notification{
+			Cancelled:  true,
+			TripID:     ot.TripID,
+			StopTimeID: "",
+			Delay:      ot.NextStop.Delay,
+			Lat:        ot.Lat,
+			Lon:        ot.Lon,
+			Route:      sr,
+			Trip:       st,
+			StopTimes:  static.StopTimeArray{},
+		}
+
+		ntjson, err := nt.ToJSON()
+
+		if err != nil {
+			env.Log.WithField("err", err).Errorf("%v - Failed to marshal notification struct", env.execname)
+			continue
+		}
+
+		err = env.Notification.Send(ntjson)
+
+		if err != nil {
+			env.Log.WithField("err", err).Errorf("%v - Failed to send notification", env.execname)
+			continue
+		}
+
+		// Send our final output trip to the output channel
+		oc <- ot
+	}
+}
+
 // createOutputTrip takes in a route, trip, stoptime and combined realtime entity and produces an output trip
-func createOutputTrip(r static.Route, t static.Trip, nxtst static.StopTime, cmb realtime.CombEntity) output.OutTrip {
+func createOutputTrip(r static.Route, t static.Trip, nxtst static.StopTime, cmb realtime.CombEntity, c bool) output.OutTrip {
 	next := output.NextStop{
 		StopTimeID:       nxtst.ID,
 		ID:               nxtst.StopInfo.ID,
@@ -401,6 +460,7 @@ func createOutputTrip(r static.Route, t static.Trip, nxtst static.StopTime, cmb 
 	}
 
 	ot := output.OutTrip{
+		Cancelled:      c,
 		TripID:         t.ID,
 		RouteID:        t.RouteID,
 		RouteLongName:  r.LongName,

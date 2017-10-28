@@ -9,6 +9,7 @@ import (
 // Models to be passed to the notification service
 
 type Notification struct {
+	Cancelled  bool
 	TripID     string
 	StopTimeID string
 	Delay      int

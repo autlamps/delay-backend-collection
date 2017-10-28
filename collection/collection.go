@@ -383,6 +383,7 @@ func (env *Env) processEntity(ec <-chan realtime.CombEntity, oc chan<- output.Ou
 // createOutputTrip takes in a route, trip, stoptime and combined realtime entity and produces an output trip
 func createOutputTrip(r static.Route, t static.Trip, nxtst static.StopTime, cmb realtime.CombEntity) output.OutTrip {
 	next := output.NextStop{
+		StopTimeID:       nxtst.ID,
 		ID:               nxtst.StopInfo.ID,
 		Name:             nxtst.StopInfo.Name,
 		Lat:              nxtst.StopInfo.Lat,

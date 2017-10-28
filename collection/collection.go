@@ -159,7 +159,7 @@ func (env *Env) Run() error {
 	wg.Add(env.WorkerNo)
 
 	// Dispatch our cancelled work separately as we assume we don't get vehicle location for cancelled trips
-	go env.processCancelledEntity(tu.Response.Entities, oc, wg)
+	go env.processCancelledEntities(tu.Response.Entities, oc, wg)
 
 	cmb, err := realtime.CombineTripUpdates(tu.Response.Entities, vl.Response.Entities)
 
@@ -204,7 +204,7 @@ func (env *Env) Run() error {
 	}
 
 	// Currently setting delays key to expire after 40 seconds
-	err = env.ObjStore.Save("delays", ojsn, 120)
+	err = env.ObjStore.Save("delays", ojsn, 15000)
 
 	if err != nil {
 		return err

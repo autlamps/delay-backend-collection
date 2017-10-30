@@ -400,6 +400,13 @@ func createOutputTrip(r static.Route, t static.Trip, nxtst static.StopTime, cmb 
 		next.Eta = cmb.Update.StopUpdate.Event.Time
 	}
 
+	// Giant hack to fix our database having UTC timezones
+	loc, _ := time.LoadLocation("Pacific/Auckland")
+
+	nextETAString := next.Eta.Format("15:04:05")
+	next.Eta, _ = time.ParseInLocation("15:04:05", nextETAString, loc)
+	// End giant hack
+
 	ot := output.OutTrip{
 		TripID:         t.ID,
 		RouteID:        t.RouteID,
